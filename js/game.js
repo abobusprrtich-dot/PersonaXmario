@@ -10,36 +10,110 @@ const Game = {
   pausedFrom: null,
 
   init() {
-    this.canvas = document.getElementById('screen');
-    this.ctx = this.canvas.getContext('2d');
-    this.ctx.imageSmoothingEnabled = false;
+    if (window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window) document.body.classList.add('touch');
+    // the game draws into a 384x224 buffer; present() blows it up onto the visible screen with CRT/LCD effects
+    this.view = document.getElementById('screen');
+    this.vctx = this.view.getContext('2d');
+    [this.canvas, this.ctx] = makeCanvas(VIEW_W, VIEW_H);
+    this.fxMode = this.isTouch() ? 'lcd' : 'crt';
+    try { const m = localStorage.getItem('px-fx'); if (['crt', 'lcd', 'clean'].includes(m)) this.fxMode = m; } catch (e) { /* storage blocked */ }
     buildSprites();
     this.certImgs = {};
     for (const [k, v] of Object.entries(CERTS)) { const im = new Image(); im.src = v.thumb; this.certImgs[k] = im; }
-    window.addEventListener('resize', () => this.resize()); this.resize();
     UI.init();
+    window.addEventListener('resize', () => this.resize());
+    window.addEventListener('orientationchange', () => setTimeout(() => this.resize(), 120));
+    this.resize();
     Input.onKey(e => UI.onKey(e));
     // title backdrop
     this.world = new World(buildLevel1());
     this.player = new Player(this.world.def.start.x, this.world.def.start.y);
     this.player.hidden = true;
-    this.state = 'title';
-    UI.show('title');
+    this.state = 'boot'; this.bootT = 0;
     let last = performance.now(), acc = 0;
     const frame = now => {
       acc += Math.min(0.1, (now - last) / 1000); last = now;
       while (acc >= 1 / 60) { this.step(); acc -= 1 / 60; }
       this.render();
+      this.present();
       requestAnimationFrame(frame);
     };
     requestAnimationFrame(frame);
   },
 
+  // size the screen for the current layout: CRT monitor (desktop) or handheld (touch, portrait/landscape)
   resize() {
-    const s = Math.min(window.innerWidth / VIEW_W, window.innerHeight / VIEW_H);
-    const scale = s >= 2 ? Math.floor(s * 4) / 4 : s;
-    this.canvas.style.width = Math.floor(VIEW_W * scale) + 'px';
-    this.canvas.style.height = Math.floor(VIEW_H * scale) + 'px';
+    const W = window.innerWidth, H = window.innerHeight, touch = this.isTouch(), portrait = H >= W;
+    document.body.classList.toggle('portrait', touch && portrait);
+    document.body.classList.toggle('landscape', touch && !portrait);
+    let maxW, maxH;
+    if (!touch) { maxW = W - 120; maxH = H - 150; }
+    else if (portrait) { maxW = W - 58; maxH = H * 0.42; }
+    else { maxW = W - Math.min(400, W * 0.48); maxH = H - 64; }
+    const s = Math.max(0.5, Math.min(maxW / VIEW_W, maxH / VIEW_H));
+    const scale = !touch && s >= 2 ? Math.floor(s * 2) / 2 : s;
+    const cw = Math.floor(VIEW_W * scale), ch = Math.floor(VIEW_H * scale);
+    const wrap = document.getElementById('screen-wrap');
+    wrap.style.width = cw + 'px'; wrap.style.height = ch + 'px';
+    // backing store close to device pixels so scanlines stay crisp
+    const k = Math.max(1, Math.min(4, Math.round(cw * (window.devicePixelRatio || 1) / VIEW_W)));
+    if (this.view.width !== VIEW_W * k) { this.view.width = VIEW_W * k; this.view.height = VIEW_H * k; }
+    this.fxScale = k; this.buildFx();
+    // on handhelds the menus live inside the screen area, never over the buttons
+    if (touch) requestAnimationFrame(() => {
+      const st = document.documentElement.style;
+      const dp = document.getElementById('dpad').getBoundingClientRect(), ab = document.getElementById('ab').getBoundingClientRect();
+      if (portrait) { st.setProperty('--ov-top', '0px'); st.setProperty('--ov-left', '0px'); st.setProperty('--ov-w', W + 'px'); st.setProperty('--ov-h', Math.max(220, Math.min(dp.top, ab.top) - 6) + 'px'); }
+      else { st.setProperty('--ov-top', '0px'); st.setProperty('--ov-left', (dp.right + 6) + 'px'); st.setProperty('--ov-w', Math.max(260, ab.left - dp.right - 12) + 'px'); st.setProperty('--ov-h', H + 'px'); }
+    });
+    this.applyFxClass();
+  },
+
+  // pre-rendered overlay for the current screen effect at the current backing scale
+  buildFx() {
+    const k = this.fxScale, w = VIEW_W * k, h = VIEW_H * k;
+    const [c, ctx] = makeCanvas(w, h);
+    if (this.fxMode === 'crt') {
+      if (k >= 2) {
+        ctx.fillStyle = `rgba(0,0,0,${k >= 3 ? 0.42 : 0.3})`;
+        for (let y = k - 1; y < h; y += k) ctx.fillRect(0, y, w, 1);
+        if (k >= 3) { // aperture grille
+          const cols = ['rgba(255,60,60,0.07)', 'rgba(60,255,90,0.05)', 'rgba(70,110,255,0.08)'];
+          for (let x = 0; x < w; x++) { ctx.fillStyle = cols[x % 3]; ctx.fillRect(x, 0, 1, h); }
+        }
+      }
+      const g = ctx.createRadialGradient(w / 2, h / 2, h * 0.35, w / 2, h / 2, w * 0.68);
+      g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.5)');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+    } else if (this.fxMode === 'lcd') {
+      if (k >= 2) {
+        ctx.fillStyle = 'rgba(20,24,10,0.2)';
+        for (let y = k - 1; y < h; y += k) ctx.fillRect(0, y, w, 1);
+        for (let x = k - 1; x < w; x += k) ctx.fillRect(x, 0, 1, h);
+      }
+      const g = ctx.createLinearGradient(0, 0, w, h);
+      g.addColorStop(0, 'rgba(255,255,240,0.06)'); g.addColorStop(0.5, 'rgba(255,255,240,0)'); g.addColorStop(1, 'rgba(0,0,0,0.12)');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+    }
+    this.fx = this.fxMode === 'clean' ? null : c;
+  },
+  applyFxClass() {
+    const wrap = document.getElementById('screen-wrap');
+    wrap.classList.remove('crt', 'lcd', 'clean'); wrap.classList.add(this.fxMode);
+    const b = document.getElementById('hud-fx'); if (b) b.textContent = this.fxMode.toUpperCase();
+  },
+  cycleFx() {
+    const order = ['crt', 'lcd', 'clean'];
+    this.fxMode = order[(order.indexOf(this.fxMode) + 1) % 3];
+    try { localStorage.setItem('px-fx', this.fxMode); } catch (e) { /* ignore */ }
+    this.buildFx(); this.applyFxClass();
+    if (this.state === 'play') this.showToast('SCREEN: ' + this.fxMode.toUpperCase(), 90);
+  },
+  present() {
+    const v = this.vctx;
+    v.imageSmoothingEnabled = false;
+    v.drawImage(this.canvas, 0, 0, this.view.width, this.view.height);
+    if (this.fx) v.drawImage(this.fx, 0, 0);
   },
 
   // ---------- flow ----------
@@ -47,6 +121,7 @@ const Game = {
     Audio8.init();
     Object.assign(this, { score: 0, coins: 0, deaths: 0, bossBeaten: false, stack: [], startedAt: performance.now() });
     UI.hideAll();
+    Input.clear();
     this.loadLevel('L1');
   },
 
@@ -78,6 +153,10 @@ const Game = {
   step() {
     Input.tick();
     this.time++;
+    if (this.state === 'boot') {
+      if (++this.bootT > 150 || (this.bootT > 20 && (Input.pressed('jump') || Input.pressed('start') || Input.pressed('pause')))) this.toTitle();
+      return;
+    }
     if (this.state === 'title') {
       this.world.time++;
       this.world.camX = (Math.sin(this.time * 0.002) * 0.5 + 0.5) * 900;
@@ -362,11 +441,18 @@ const Game = {
   isTouch() { return document.body.classList.contains('touch'); },
 
   // ---------- rendering ----------
+  toTitle() {
+    this.state = 'title'; Input.clear();
+    if (!this.isTouch()) UI.show('title');
+  },
+
   render() {
     const ctx = this.ctx, w = this.world;
     if (!w) return;
+    if (this.state === 'boot') return this.drawBoot(ctx);
     const cam = Math.floor(w.camX);
     w.drawBackground(ctx);
+    w.drawDecor(ctx);
     this.drawWorldDecor(ctx, cam);
     for (const e of w.entities) if (e.behind) e.draw(ctx, cam, w.time, w);
     if (this.player.behind) this.player.draw(ctx, cam, w.time);
@@ -377,6 +463,33 @@ const Game = {
     if (this.state !== 'title') this.drawHUD(ctx);
     if (this.fade > 0) { ctx.fillStyle = `rgba(0,0,0,${this.fade})`; ctx.fillRect(0, 0, VIEW_W, VIEW_H); }
     if (this.card) this.drawCard(ctx);
+    if (this.state === 'title' && this.isTouch()) this.drawHandheldTitle(ctx);
+  },
+
+  // power-on screen: the logo drops in like an old handheld boot
+  drawBoot(ctx) {
+    const t = this.bootT;
+    ctx.fillStyle = '#f4f2e6'; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    const y = Math.min(84, -30 + t * 1.6);
+    drawText(ctx, 'DILYOR', VIEW_W / 2, y, '#2b2f8f', { align: 'center', scale: 4 });
+    if (t > 75) {
+      const cols = ['#e0315f', '#ff9d1a', '#2fae3c', '#1f8ad6', '#8a3ffc'];
+      'PIXEL CV'.split('').forEach((ch, i) => drawText(ctx, ch, VIEW_W / 2 - 23 + i * 6, y + 36, cols[i % cols.length]));
+    }
+    if (t > 95) drawText(ctx, 'PRESS START', VIEW_W / 2, 170, t % 40 < 26 ? '#6a6a80' : '#f4f2e6', { align: 'center' });
+    if (t > 130) { ctx.fillStyle = `rgba(244,242,230,${(t - 130) / 20})`; ctx.fillRect(0, 0, VIEW_W, VIEW_H); }
+  },
+
+  drawHandheldTitle(ctx) {
+    const t = this.time;
+    ctx.fillStyle = '#0b0b1acc'; ctx.fillRect(0, 34, VIEW_W, 150);
+    ctx.fillStyle = '#ffd23f'; ctx.fillRect(0, 34, VIEW_W, 2); ctx.fillRect(0, 182, VIEW_W, 2);
+    drawText(ctx, 'AN INTERACTIVE PIXEL CV', VIEW_W / 2, 44, '#7de87a', { align: 'center' });
+    drawText(ctx, 'SUPER', VIEW_W / 2, 60, '#c08cff', { align: 'center', scale: 3, shadow: '#3f1a6e' });
+    drawText(ctx, 'DILYOR', VIEW_W / 2, 86, '#ffd23f', { align: 'center', scale: 4, shadow: '#b34a00' });
+    if (t % 50 < 34) drawText(ctx, 'PRESS START', VIEW_W / 2, 132, '#ffffff', { align: 'center', scale: 2, shadow: '#000' });
+    drawText(ctx, 'SELECT: READ THE CV', VIEW_W / 2, 158, '#8ab8ff', { align: 'center' });
+    drawText(ctx, 'A JUMP  B RUN/SHOOT  v PIPE', VIEW_W / 2, 170, '#a89cc8', { align: 'center' });
   },
 
   drawWorldDecor(ctx, cam) {
@@ -502,6 +615,16 @@ const UI = {
     this.el('hud-cv').onclick = () => this.openCV();
     this.el('hud-pause').onclick = () => this.pause();
     this.el('hud-sound').onclick = () => this.toggleSound();
+    this.el('hud-fx').onclick = () => Game.cycleFx();
+    const shells = ['grape', 'teal', 'berry', 'kiwi', 'dandelion', 'smoke'];
+    let shell = 0;
+    try { shell = Math.max(0, shells.indexOf(localStorage.getItem('px-shell'))); } catch (e) { /* ignore */ }
+    document.body.dataset.shell = shells[shell];
+    this.el('brand').onclick = () => {
+      shell = (shell + 1) % shells.length; document.body.dataset.shell = shells[shell];
+      try { localStorage.setItem('px-shell', shells[shell]); } catch (e) { /* ignore */ }
+      Audio8.init(); Audio8.play('select');
+    };
     this.el('btn-resume').onclick = () => this.resume();
     this.el('btn-restart').onclick = () => { this.hide('pause'); Game.state = 'play'; Game.fade = 0; Game.killPlayer(); };
     this.el('btn-cv-close').onclick = () => this.closeCV();
@@ -512,8 +635,7 @@ const UI = {
     this.el('btn-ending-cv').onclick = () => this.openCV();
     document.querySelectorAll('.overlay').forEach(o => o.addEventListener('pointerdown', e => { if (e.target === o && o.id === 'dialog') Game.closeDialog(); }));
     this.updateSoundIcon();
-    if (window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window) document.body.classList.add('touch');
-    Input.bindTouch(this.el('touch'));
+    Input.bindPad();
     this.buildCV();
   },
   show(id) { this.el(id).classList.add('open'); },
@@ -528,10 +650,13 @@ const UI = {
       else if (e.code === 'ArrowLeft' || e.code === 'KeyA') this.stepPart(-1);
       return;
     }
-    if (this.isOpen('cv')) { if (e.code === 'Escape') this.closeCV(); return; }
-    if (this.isOpen('pause')) { if (e.code === 'Escape' || e.code === 'KeyP') { e.preventDefault(); this.resume(); } return; }
-    if (this.isOpen('title') && (e.code === 'Enter' || e.code === 'Space')) { e.preventDefault(); Audio8.init(); Game.start(); return; }
+    if (this.isOpen('cv')) { if (['Escape', 'Enter', 'KeyC', 'KeyX'].includes(e.code) && (e.virtual || e.code === 'Escape')) this.closeCV(); return; }
+    if (this.isOpen('pause')) { if (['Escape', 'KeyP', 'Enter'].includes(e.code)) { e.preventDefault(); this.resume(); } else if (e.virtual && e.code === 'KeyC') this.openCV(); return; }
+    if (this.isOpen('ending')) { if (e.virtual && (e.code === 'Enter' || e.code === 'Space')) { this.hide('ending'); Game.fade = 0; Game.start(); } else if (e.virtual && e.code === 'KeyC') this.openCV(); return; }
+    if (Game.state === 'title' && (e.code === 'Enter' || (e.code === 'Space' && this.isOpen('title')))) { e.preventDefault(); Audio8.init(); Audio8.play('select'); Game.start(); return; }
+    if (Game.state === 'title' && e.code === 'KeyC') { this.openCV(); return; }
     if (e.code === 'KeyM') this.toggleSound();
+    if (e.code === 'KeyV') Game.cycleFx();
     if (e.code === 'KeyC' && Game.state === 'play') this.openCV();
   },
 

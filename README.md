@@ -8,6 +8,8 @@ Dilyorbek Esonboyev's CV as a Mario-style (but original) 2D pixel platformer.
 - **Final boss:** King Bugzer, the final bug. Stomp him, zap him with Uno bolts, or hit the switch behind him.
 - Certificates (Purple Comet, Mirzo Ulugbek Vorislari, IdeaThon) are pixelated and shown in the *Hall of Honors* pipe.
 - Don't want to play? Hit **📜 CV mode** for the plain version.
+- **Retro screen:** a CRT monitor with scanlines on desktop, and a handheld with an LCD pixel grid on phones.
+  Switch between CRT / LCD / CLEAN with the screen button or **V**. Tap the *DILYOR BOY COLOR* logo to change the shell colour.
 
 | Chapter | World |
 | --- | --- |
@@ -17,14 +19,15 @@ Dilyorbek Esonboyev's CV as a Mario-style (but original) 2D pixel platformer.
 
 ## Controls
 
-| Action | Keyboard | Touch |
+| Action | Keyboard | Handheld (phone) |
 | --- | --- | --- |
-| Move | ← → / A D | ◀ ▶ |
+| Move | ← → / A D | D-pad (slide your thumb) |
 | Jump (hold = higher) | Space / Z / ↑ / W | A |
-| Run / shoot bolts (with Uno power) | X / J / Shift | B |
-| Enter pipe | ↓ / S | ▼ |
-| Read the ! block above you | E | jump into it |
-| Pause · CV mode · Mute | Esc · C · M | top-right buttons |
+| Run / shoot bolts (with Uno power) | X / J / Shift | B (rest your thumb between A and B to press both) |
+| Enter pipe | ↓ / S | D-pad ↓ |
+| Read the ! block above you | E | D-pad ↑ or jump into it |
+| Pause · CV mode | Esc · C | START · SELECT |
+| Mute · screen effect | M · V | buttons under the screen |
 
 ## Run it
 
@@ -48,7 +51,8 @@ index.html          page + overlays
 css/style.css       pixel UI
 js/content.js       CV data
 js/font.js          5x7 bitmap font
-js/sprites.js       pixel art, tiles, backgrounds, boss
+js/sprites.js       characters, items, boss
+js/tiles.js         dithered tiles, decorations, parallax backgrounds
 js/audio.js         chiptune SFX + music (WebAudio)
 js/input.js         keyboard + touch
 js/levels.js        worlds 1-1, 2-1, 3-1, boss castle, pipe rooms

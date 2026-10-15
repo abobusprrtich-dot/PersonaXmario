@@ -14,12 +14,37 @@
 </head>
 <body>
   <main id="stage">
-    <canvas id="screen" width="384" height="224" aria-label="Super Dilyor platformer game"></canvas>
+    <div id="device">
+      <div id="bezel">
+        <div id="bezel-top"><i class="stripe"></i><span>PIXEL CV · DOT MATRIX COLOR</span><i class="stripe"></i></div>
+        <div id="screen-row">
+          <div id="power"><span class="led"></span><small>POWER</small></div>
+          <div id="screen-wrap">
+            <canvas id="screen" width="1152" height="672" aria-label="Super Dilyor platformer game"></canvas>
+            <div id="glass"></div>
+          </div>
+        </div>
+        <div id="brand-bar">
+          <button id="brand" title="Change the shell colour" aria-label="Change the shell colour"><b>DILYOR</b> <i>BOY</i> <span class="rainbow"><em>C</em><em>O</em><em>L</em><em>O</em><em>R</em></span></button>
+          <div id="hud-buttons">
+            <button id="hud-sound" title="Sound (M)" aria-label="Toggle sound">🔊</button>
+            <button id="hud-fx" title="Screen: CRT / LCD / clean (V)" aria-label="Change screen effect">CRT</button>
+            <button id="hud-cv" title="CV mode (C)" aria-label="Open the plain CV">📜</button>
+            <button id="hud-pause" title="Pause (Esc)" aria-label="Pause">❚❚</button>
+          </div>
+        </div>
+      </div>
 
-    <div id="hud-buttons">
-      <button id="hud-sound" title="Sound (M)" aria-label="Toggle sound">🔊</button>
-      <button id="hud-cv" title="CV mode (C)" aria-label="Open the plain CV">📜</button>
-      <button id="hud-pause" title="Pause (Esc)" aria-label="Pause">⏸</button>
+      <div id="dpad" aria-hidden="true">
+        <span class="arm up"></span><span class="arm down"></span><span class="arm left"></span><span class="arm right"></span><span class="hub"></span>
+      </div>
+      <div id="ab" aria-hidden="true">
+        <div class="btn-col b"><span class="round" data-ab="run"></span><small>B</small></div>
+        <div class="btn-col a"><span class="round" data-ab="jump"></span><small>A</small></div>
+      </div>
+      <div id="sel" class="pill-col" aria-hidden="true"><button data-btn="select" class="pill"></button><small>SELECT</small></div>
+      <div id="start" class="pill-col" aria-hidden="true"><button data-btn="start" class="pill"></button><small>START</small></div>
+      <div id="speaker" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
     </div>
 
     <!-- Title -->
@@ -100,25 +125,12 @@
       </div>
     </section>
 
-    <div id="rotate-hint">↻ rotate your phone for a bigger screen</div>
-
-    <!-- Touch controls -->
-    <div id="touch" aria-hidden="true">
-      <div class="dpad">
-        <button data-btn="left">◀</button>
-        <button data-btn="down">▼</button>
-        <button data-btn="right">▶</button>
-      </div>
-      <div class="ab">
-        <button data-btn="run" class="b">B</button>
-        <button data-btn="jump" class="a">A</button>
-      </div>
-    </div>
   </main>
 
   <script src="js/content.js"></script>
   <script src="js/font.js"></script>
   <script src="js/sprites.js"></script>
+  <script src="js/tiles.js"></script>
   <script src="js/audio.js"></script>
   <script src="js/input.js"></script>
   <script src="js/levels.js"></script>

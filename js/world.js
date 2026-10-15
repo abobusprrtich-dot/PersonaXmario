@@ -10,6 +10,8 @@ class World {
     this.theme = def.theme;
     this.tileset = SPR.tiles[def.theme];
     this.bg = SPR.bg[def.theme];
+    this.sky = buildSky((def.sky || ['#000', '#000'])[0], (def.sky || ['#000', '#000'])[1]);
+    this.decor = def.decor || [];
     this.entities = [];
     this.particles = [];
     this.bumps = new Map();
@@ -62,7 +64,7 @@ class World {
       }
     } else if (e.vy < 0) {
       const ty = Math.floor(e.y / TILE);
-      for (let tx = x0; tx <= x1; tx++) if (this.solidAt(tx, ty)) info.head.push(tx);
+      for (let tx = x0; tx <= x1; tx++) if (this.solidAt(tx, ty) || (opts.hidden && this.tileAt(tx, ty) === T.HIDDEN)) info.head.push(tx);
       if (info.head.length) { e.y = (ty + 1) * TILE; e.vy = 0; info.headRow = ty; }
     }
     return info;
@@ -87,7 +89,8 @@ class World {
     const t = this.tileAt(tx, ty);
     const key = tx + ',' + ty;
     const startBump = () => this.bumps.set(key, 10);
-    if (t === T.QCOIN) {
+    if (t === T.QCOIN || t === T.HIDDEN) {
+      if (t === T.HIDDEN) game.world.popText(tx * TILE + 8, ty * TILE - 20, 'SECRET!', '#7dffb5');
       this.setTile(tx, ty, T.USED); startBump();
       this.entities.push(new CoinPop(tx * TILE + 4, ty * TILE - 8));
       game.addCoin(tx * TILE + 8, ty * TILE - 16);
@@ -134,10 +137,7 @@ class World {
 
   // ---------- rendering ----------
   drawBackground(ctx) {
-    const [top, bottom] = this.def.sky || ['#000', '#000'];
-    const g = ctx.createLinearGradient(0, 0, 0, VIEW_H);
-    g.addColorStop(0, top); g.addColorStop(1, bottom);
-    ctx.fillStyle = g; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    ctx.drawImage(this.sky, 0, 0);
     for (const layer of this.bg) {
       const off = -Math.floor((this.camX * layer.speed) % 512);
       for (let x = off; x < VIEW_W; x += 512) ctx.drawImage(layer.img, x, 0);
@@ -158,8 +158,9 @@ class World {
         ctx.fillStyle = '#ffffffcc'; ctx.fillRect(Math.round(x), Math.round(y - 2), 3, 2);
       }
     } else if (this.theme === 'castle') {
-      ctx.fillStyle = `rgba(255,90,20,${0.08 + Math.sin(this.time * 0.05) * 0.03})`;
-      ctx.fillRect(0, 150, VIEW_W, 74);
+      // dithered lava glow near the floor, pulsing between two densities
+      if (!World.glow) World.glow = [0.4, 0.6].map(k => paint(VIEW_W, 74, (x, y) => dith(x, y, y / 74 * k) ? '#3a1418' : null));
+      ctx.drawImage(World.glow[Math.sin(this.time * 0.05) > 0 ? 1 : 0], 0, 150);
     }
   }
 
@@ -171,7 +172,14 @@ class World {
       const t = this.tiles[ty][tx]; if (!t) continue;
       let img = null;
       switch (t) {
-        case T.GROUND: img = (ty > 0 && this.tiles[ty - 1][tx] === T.GROUND) ? ts.groundFill : ts.groundTop; break;
+        case T.GROUND: {
+          const top = !(ty > 0 && this.tiles[ty - 1][tx] === T.GROUND);
+          ctx.drawImage(top ? ts.groundTop : ts.groundFill, tx * TILE - cam, ty * TILE);
+          if (tx > 0 && this.tiles[ty][tx - 1] !== T.GROUND) ctx.drawImage(top ? ts.edgeTopL : ts.edgeL, tx * TILE - cam, ty * TILE);
+          if (tx < this.w - 1 && this.tiles[ty][tx + 1] !== T.GROUND) ctx.drawImage(top ? ts.edgeTopR : ts.edgeR, tx * TILE - cam, ty * TILE);
+          continue;
+        }
+        case T.WATER: img = (ty > 0 && this.tiles[ty - 1][tx] === T.WATER ? ts.waterFill : ts.waterTop)[Math.floor(this.time / 24) % 2]; break;
         case T.BRICK: img = ts.brick; break;
         case T.QCOIN: case T.QPOWER: img = ts.q[qf]; break;
         case T.USED: img = ts.used; break;
@@ -192,6 +200,35 @@ class World {
       const b = this.bumps.get(tx + ',' + ty);
       const oy = b ? -Math.round(Math.sin(Math.PI * (10 - b) / 10) * 5) : 0;
       ctx.drawImage(img, tx * TILE - cam, ty * TILE + oy);
+    }
+  }
+
+  // scenery behind the tiles: placed props + auto grass tufts / flowers on ground tops
+  drawDecor(ctx) {
+    const cam = Math.floor(this.camX), D = SPR.deco, t = this.time;
+    const x0 = Math.max(0, Math.floor(cam / TILE) - 1), x1 = Math.min(this.w - 1, x0 + Math.ceil(VIEW_W / TILE) + 2);
+    if (this.theme === 'fields' || this.theme === 'sky') {
+      for (let tx = x0; tx <= x1; tx++) for (let ty = 1; ty < ROWS; ty++) {
+        if (this.tiles[ty][tx] !== T.GROUND || this.tiles[ty - 1][tx] !== T.EMPTY) continue;
+        const h = hash(tx, ty * 7 + 3);
+        const img = h < 0.22 ? D.tuft : h < 0.29 ? D.flowerA : h < 0.34 ? D.flowerB : null;
+        if (img) ctx.drawImage(img, tx * TILE - cam + Math.floor(hash(tx, 9) * 8), ty * TILE - img.height);
+      }
+    } else if (this.theme === 'cavern') {
+      for (let tx = x0; tx <= x1; tx++) for (let ty = 1; ty < ROWS; ty++) {
+        if (this.tiles[ty][tx] !== T.GROUND || this.tiles[ty - 1][tx] !== T.EMPTY) continue;
+        const h = hash(tx, ty * 5 + 1);
+        if (h < 0.12) { const l = D.led[(tx % 3)][Math.floor(t / 30 + tx) % 2]; ctx.drawImage(l, tx * TILE - cam + 4, ty * TILE - 14); }
+        else if (h < 0.18) ctx.drawImage(D.resistor, tx * TILE - cam - 1, ty * TILE - 6);
+        else if (h < 0.22) ctx.drawImage(D.capacitor, tx * TILE - cam + 3, ty * TILE - 16);
+      }
+    }
+    for (const d of this.decor) {
+      const x = d.x - cam;
+      if (x > VIEW_W + 16 || x < -80) continue;
+      let img = D[d.type];
+      if (Array.isArray(img)) img = Array.isArray(img[0]) ? img[d.v || 0][Math.floor(t / 30) % 2] : img[Math.floor(t / (d.type === 'torch' ? 7 : 14)) % img.length];
+      if (img) ctx.drawImage(img, Math.round(x), Math.round(d.y - img.height));
     }
   }
 

@@ -8,7 +8,7 @@ class LevelBuilder {
   constructor(opts) {
     Object.assign(this, { theme: 'fields', music: 'fields', ceiling: false }, opts);
     this.tiles = Array.from({ length: ROWS }, () => new Array(this.w).fill(T.EMPTY));
-    this.entities = []; this.pipes = []; this.texts = []; this.boards = [];
+    this.entities = []; this.pipes = []; this.texts = []; this.boards = []; this.decor = [];
     this.start = { x: 2, y: GY - 1 };
   }
   set(x, y, t) { if (x >= 0 && x < this.w && y >= 0 && y < ROWS) this.tiles[y][x] = t; }
@@ -22,6 +22,10 @@ class LevelBuilder {
     [...str].forEach((ch, i) => { if (map[ch] !== undefined) this.set(x + i, y, map[ch]); });
     return this;
   }
+  // scenery: x in tiles, y = the tile row it stands on (its bottom edge)
+  deco(type, x, y = GY, v = 0) { this.decor.push({ type, x: x * TILE, y: y * TILE, v }); return this; }
+  water(x0, x1, top = GY) { return this.fill(x0, top, x1 - x0, ROWS - top, T.WATER); }
+  hidden(x, y) { this.set(x, y, T.HIDDEN); return this; }
   coins(x, y, n) { for (let i = 0; i < n; i++) this.set(x + i, y, T.COIN); return this; }
   pipe(x, h, section, base = GY) {
     const top = base - h;
@@ -42,7 +46,7 @@ class LevelBuilder {
   build() {
     return {
       id: this.id, name: this.name, title: this.title, theme: this.theme, music: this.music, w: this.w,
-      tiles: this.tiles, entities: this.entities, pipes: this.pipes, texts: this.texts, boards: this.boards,
+      tiles: this.tiles, entities: this.entities, pipes: this.pipes, texts: this.texts, boards: this.boards, decor: this.decor,
       start: { x: this.start.x * TILE + 2, y: this.start.y * TILE }, sky: this.sky, isRoom: !!this.isRoom,
       section: this.section, next: this.next, arena: this.arena, ceiling: this.ceiling,
     };
@@ -50,72 +54,83 @@ class LevelBuilder {
 }
 
 // ---------------- 1-1 GULISTON FIELDS ----------------
+// Cotton fields, irrigation canals and terraces. Pipes 1-3.
 function buildLevel1() {
-  const L = new LevelBuilder({ id: 'L1', name: '1-1', title: 'GULISTON FIELDS', theme: 'fields', music: 'fields', w: 196, sky: ['#5fb8ff', '#a9dcff'], next: 'L2' });
-  L.ground(0, 40).ground(43, 62).ground(65, 104).ground(108, 196);
+  const L = new LevelBuilder({ id: 'L1', name: '1-1', title: 'GULISTON FIELDS', theme: 'fields', music: 'fields', w: 204, sky: ['#4fa8ff', '#bfe6ff'], next: 'L2' });
+  L.ground(0, 34).ground(37, 50).ground(52, 62).ground(65, 106).ground(110, 160).ground(163, 204);
+  L.water(34, 37).water(50, 52).water(62, 65).water(106, 110).water(160, 163);
+  L.deco('house', 0.5).deco('signpost', 5).deco('fence', 9).deco('fence', 10);
   L.text(2, 3, "HI! I'M DILYOR.", '#ffffff').text(2, 4.2, 'THIS GAME IS MY CV.', '#fff6c8')
    .text(2, 5.4, 'GREEN PIPES = CHAPTERS', '#c9ffc0');
-  // opening blocks
-  L.row(10, 8, '?BPB?').row(12, 4, '?');
+  L.row(10, 8, '?BPB?').row(12, 4, '?').hidden(7, 8);
   L.add('bug', 17, GY - 1);
   // PART 1: about
-  L.pipe(22, 2, 'about');
-  L.add('bug', 30, GY - 1).add('bug', 32, GY - 1);
-  L.row(28, 8, 'B?B').coins(34, 9, 3);
-  // first pit
-  L.coins(40, 8, 3);
-  // stair pyramids with a gap
-  L.stairs(46, 4, 1).stairs(52, 4, -1);
-  L.gap(50, 52);
-  L.coins(49, 6, 4);
-  // cloud steps
-  L.row(58, 8, '---').coins(58, 7, 3);
-  L.gap(62, 65); L.row(62, 9, '---');
-  // PART 2: education
-  L.pipe(70, 3, 'education');
+  L.pipe(22, 2, 'about').deco('bush', 24.6);
+  // terrace with bugs
+  L.ground(27, 33, 10).coins(28, 7, 4);
+  L.add('bug', 29, 9).add('bug', 31, 9);
+  L.deco('sprinkler', 33, 10);
+  // cotton rows along the canal
+  L.row(40, 8, 'B?B').coins(44, 9, 3);
+  for (const x of [38, 39.2, 41.5, 42.7, 44.5]) L.deco('cotton', x);
+  L.add('bug', 43, GY - 1).add('bug', 45, GY - 1);
+  // stair pyramids over a canal
+  L.stairs(46, 4, 1).stairs(52, 4, -1).coins(49, 6, 4);
+  L.deco('sprinkler', 56).deco('cotton', 57.5).deco('cotton', 58.7);
+  // cloud steps over the second canal
+  L.row(58, 8, '---').coins(58, 7, 3).row(62, 9, '---');
+  // PART 2: education on a terrace
+  L.ground(66, 71, 10).deco('fence', 66, 10).deco('fence', 67, 10);
+  L.pipe(72, 3, 'education');
   L.add('bug', 76, GY - 1).add('drone', 80, 6, { range: 48 });
+  // spring to the upper brick road
   L.add('spring', 84, GY - 1);
-  L.coins(83, 2, 5);
-  L.row(88, 8, 'B?BB?B').row(90, 4, 'BPB');
+  L.row(86, 4, 'BBBB?BBBBB').coins(87, 3, 8);
+  L.row(88, 8, 'B?BB?B');
   L.add('bug', 92, GY - 1).add('bug', 94, GY - 1);
-  L.row(98, 9, 'SS').row(99, 8, 'S');
-  // wide gap with cloud bridge
-  L.row(104, 9, '----').coins(104, 8, 4);
-  L.add('checkpoint', 112, GY - 1);
-  L.add('drone', 118, 7, { range: 64 });
-  // PART 3: skills (tall pipe with a step)
-  L.fill(123, GY - 2, 1, 2, T.SOLID);
-  L.pipe(125, 4, 'skills');
+  L.row(98, 9, 'SS').row(99, 8, 'S').deco('bush', 101);
+  // wide canal with a cloud bridge
+  L.row(106, 9, '----').coins(106, 8, 4);
+  L.add('checkpoint', 114, GY - 1);
+  L.deco('cotton', 116).deco('cotton', 117.2).deco('cotton', 118.4);
+  L.add('drone', 120, 7, { range: 64 });
+  // PART 3: skills on the high terrace
+  L.ground(122, 127, 10).deco('sprinkler', 123, 10);
+  L.pipe(127, 4, 'skills');
   L.add('bug', 134, GY - 1).add('bug', 137, GY - 1).add('bug', 140, GY - 1);
-  L.row(134, 8, '?B?B?').coins(135, 4, 3);
-  L.add('drone', 150, 6, { range: 56 });
-  L.row(146, 9, 'oooo').row(152, 7, 'B??B');
-  // final staircase + flag
-  L.stairs(166, 8, 1); L.fill(174, GY - 8, 1, 8, T.SOLID);
-  L.add('flag', 182, GY - 1);
-  L.text(178, 3, 'NEXT: CIRCUIT CAVERN', '#fff6c8');
+  L.row(134, 8, '?B?B?').coins(135, 4, 3).hidden(146, 8);
+  L.add('drone', 152, 6, { range: 56 });
+  L.row(148, 9, 'oooo').row(152, 7, 'B??B').deco('bush', 156);
+  // last canal, fence and the final staircase
+  L.deco('fence', 164).deco('fence', 165).deco('cotton', 166.5);
+  L.stairs(170, 8, 1); L.fill(178, GY - 8, 1, 8, T.SOLID);
+  L.add('flag', 186, GY - 1);
+  L.text(182, 3, 'NEXT: CIRCUIT CAVERN', '#fff6c8');
   return L.build();
 }
 
 // ---------------- 2-1 CIRCUIT CAVERN ----------------
+// A giant Arduino board: tunnels, sparks on the traces, spike pits. Pipes 4-6.
 function buildLevel2() {
-  const L = new LevelBuilder({ id: 'L2', name: '2-1', title: 'CIRCUIT CAVERN', theme: 'cavern', music: 'cavern', w: 210, sky: ['#071a12', '#0c2a1d'], next: 'L3', ceiling: true });
-  L.fill(0, 0, 210, 1, T.STONE);
-  L.ground(0, 34).ground(60, 72).ground(76, 120).ground(126, 128).ground(134, 210);
+  const L = new LevelBuilder({ id: 'L2', name: '2-1', title: 'CIRCUIT CAVERN', theme: 'cavern', music: 'cavern', w: 216, sky: ['#04110b', '#0d2c1e'], next: 'L3', ceiling: true });
+  L.fill(0, 0, 216, 1, T.STONE);
+  L.ground(0, 34).ground(60, 72).ground(76, 120).ground(126, 128).ground(134, 216);
   L.text(3, 3, 'WELCOME TO THE LAB', '#7dffb5').text(3, 4.2, 'MIND THE SPARKS!', '#ffe08a');
   L.row(8, 8, 'B?B?B').add('bug', 14, GY - 1);
   L.row(12, 4, 'P');
   L.add('spark', 18, 9, { axis: 'x', range: 48, speed: 0.03 });
   // PART 4: Arduinium (the big one)
   L.pipe(24, 3, 'arduinium');
-  // moving-platform crossing
+  // moving-platform crossing over a spike pit
   L.add('plat', 35, 9, { w: 3, axis: 'x', range: 64, speed: 0.012 });
   L.add('plat', 46, 7, { w: 3, axis: 'y', range: 48, speed: 0.016 });
   L.add('plat', 53, 9, { w: 3, axis: 'x', range: 40, speed: 0.02 });
   L.coins(46, 4, 3); L.fill(34, 13, 26, 1, T.SPIKES);
   L.row(42, 10, '--').row(50, 10, '--');
-  L.add('bug', 66, GY - 1).add('bug', 68, GY - 1);
-  L.row(62, 8, '?BB?');
+  // low tunnel with a coin stash above the blocks
+  L.fill(62, 1, 10, 4, T.STONE);
+  L.row(62, 8, '?BB?').coins(63, 6, 2).coins(66, 6, 2);
+  L.add('bug', 66, GY - 1).add('bug', 69, GY - 1);
   L.row(72, 10, '----');
   // PART 5: hardware lab
   L.pipe(80, 2, 'hardware');
@@ -123,7 +138,7 @@ function buildLevel2() {
   L.row(90, 8, 'BBBBBBB').row(90, 4, 'B?B?B?B');
   L.add('bug', 92, 7).add('bug', 95, 7);
   L.add('drone', 100, 6, { range: 48 });
-  L.coins(98, 10, 4);
+  L.coins(98, 10, 4).hidden(103, 8);
   L.add('checkpoint', 106, GY - 1);
   L.stairs(112, 3, 1).fill(115, GY - 3, 4, 3, T.SOLID);
   L.add('spark', 112, 5, { axis: 'x', range: 96, speed: 0.02 });
@@ -134,21 +149,26 @@ function buildLevel2() {
   L.coins(126, 7, 2);
   // PART 6: experience
   L.pipe(140, 3, 'experience');
-  L.add('bug', 148, GY - 1).add('bug', 150, GY - 1).add('drone', 156, 6, { range: 64 });
-  L.row(150, 8, 'B?B?B?B');
-  L.add('spark', 162, 10, { axis: 'x', range: 64, speed: 0.04 });
-  L.add('spring', 170, GY - 1); L.coins(169, 3, 3);
-  L.stairs(176, 6, 1); L.fill(182, GY - 6, 2, 6, T.SOLID);
-  L.add('flag', 192, GY - 1);
-  L.text(186, 3, 'NEXT: COMET HEIGHTS', '#7dffb5');
+  L.add('bug', 148, GY - 1).add('bug', 150, GY - 1).add('drone', 156, 6, { range: 48 });
+  L.row(148, 8, 'B?B?B?B');
+  // second tunnel: hop the spark under a low ceiling
+  L.fill(160, 1, 12, 5, T.STONE);
+  L.add('spark', 162, 10, { axis: 'x', range: 120, speed: 0.022 });
+  L.coins(163, 8, 6);
+  L.add('spring', 175, GY - 1); L.coins(174, 3, 3);
+  L.stairs(180, 6, 1); L.fill(186, GY - 6, 2, 6, T.SOLID);
+  L.add('flag', 196, GY - 1);
+  L.text(190, 3, 'NEXT: COMET HEIGHTS', '#7dffb5');
   return L.build();
 }
 
 // ---------------- 3-1 COMET HEIGHTS ----------------
+// Sky ruins at night: clouds, lifts, pillars and falling purple comets. Pipes 7-8.
 function buildLevel3() {
-  const L = new LevelBuilder({ id: 'L3', name: '3-1', title: 'COMET HEIGHTS', theme: 'sky', music: 'sky', w: 200, sky: ['#1a0b3d', '#7a2f8f'], next: 'BOSS' });
-  L.ground(0, 30).ground(46, 58).ground(86, 120).ground(150, 162).ground(174, 200);
+  const L = new LevelBuilder({ id: 'L3', name: '3-1', title: 'COMET HEIGHTS', theme: 'sky', music: 'sky', w: 204, sky: ['#120634', '#8a3a9a'], next: 'BOSS' });
+  L.ground(0, 30).ground(46, 58).ground(86, 120).ground(150, 162).ground(174, 204);
   L.text(3, 3, 'PURPLE COMETS FALL HERE', '#f2d7ff').text(3, 4.2, 'WATCH THE SKY!', '#ffd23f');
+  L.deco('lamp', 1).deco('lamp', 14).deco('star', 20, 6).deco('star', 40, 4).deco('star', 77, 3);
   L.row(9, 8, '?P?').add('comets', 6, 0, { x1: 140 * TILE });
   L.add('bug', 16, GY - 1).add('bug', 19, GY - 1);
   // PART 7: honors
@@ -156,12 +176,12 @@ function buildLevel3() {
   // cloud hopping
   L.row(31, 10, '---').row(36, 8, '---').row(41, 10, '---').coins(36, 7, 3);
   L.add('drone', 50, 7, { range: 48 });
-  L.row(48, 8, 'B?B');
+  L.row(48, 8, 'B?B').hidden(54, 8).deco('lamp', 56);
   L.add('plat', 59, 9, { w: 3, axis: 'x', range: 72, speed: 0.012 });
   L.row(66, 6, '---').coins(66, 5, 3).row(70, 8, '--');
   L.add('plat', 74, 8, { w: 3, axis: 'y', range: 56, speed: 0.018 });
   L.row(80, 9, '---').coins(80, 8, 3);
-  L.add('checkpoint', 88, GY - 1);
+  L.add('checkpoint', 88, GY - 1).deco('lamp', 92);
   L.add('bug', 96, GY - 1).add('bug', 98, GY - 1).add('bug', 100, GY - 1);
   // PART 8: leadership
   L.pipe(104, 3, 'leadership');
@@ -171,7 +191,10 @@ function buildLevel3() {
   L.row(122, 9, '----').row(130, 8, '---').row(137, 7, '---').row(143, 9, '----');
   L.coins(122, 8, 4); L.coins(137, 6, 3);
   L.add('drone', 132, 5, { range: 40 });
-  L.add('plat', 162, 9, { w: 3, axis: 'x', range: 88, speed: 0.014 });
+  L.deco('lamp', 152).deco('star', 158, 5);
+  // ruined pillars
+  L.fill(165, 9, 2, 5, T.STONE).fill(169, 7, 2, 7, T.STONE).coins(169, 5, 2);
+  L.add('drone', 168, 3, { range: 32 });
   L.stairs(178, 4, 1); L.fill(182, GY - 4, 2, 4, T.SOLID);
   L.add('door', 192, GY - 2);
   L.text(184, 3, "BUGZER'S CASTLE >", '#ff9aae');
@@ -184,6 +207,9 @@ function buildBoss() {
   L.fill(0, 0, 110, 2, T.STONE);
   L.ground(0, 14).fill(14, GY, 6, 2, T.LAVA).ground(20, 28).fill(28, GY, 5, 2, T.LAVA).ground(33, 40);
   L.text(2, 4, 'THE FINAL BUG AWAITS...', '#ff9aae');
+  for (const x of [3, 11, 22, 36]) L.deco('torch', x, 6);
+  for (const x of [52, 58, 64]) L.deco('banner', x, 3.9);
+  L.deco('torch', 71, 7).deco('torch', 80, 7);
   L.row(14, 9, '---').row(28, 9, '--');
   L.add('bubble', 16, GY, { delay: 0 }).add('bubble', 30, GY, { delay: 70 });
   L.fill(24, 7, 1, 1, T.USED).add('firebar', 24, 7, { len: 5, speed: 0.035 });

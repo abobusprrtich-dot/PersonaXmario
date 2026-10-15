@@ -33,7 +33,7 @@ class Player {
     if (this.platform) { this.x += this.platform.dx; this.y = this.platform.y - this.h; if (this.vy > 0) this.vy = 0; }
 
     const prevBottom = this.y + this.h;
-    const info = world.moveBody(this);
+    const info = world.moveBody(this, { hidden: true });
     this.onGround = info.ground;
     this.platform = null;
     if (this.vy >= 0) {
