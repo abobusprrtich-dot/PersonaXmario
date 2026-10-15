@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>Super Dilyor — Pixel CV</title>
+  <meta name="description" content="Dilyorbek Esonboyev's CV as a 2D pixel platformer. Jump into green pipes to read each chapter, clear 3 worlds and beat King Bugzer.">
+  <meta name="theme-color" content="#120814">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main id="stage">
+    <canvas id="screen" width="384" height="224" aria-label="Super Dilyor platformer game"></canvas>
+
+    <div id="hud-buttons">
+      <button id="hud-sound" title="Sound (M)" aria-label="Toggle sound">🔊</button>
+      <button id="hud-cv" title="CV mode (C)" aria-label="Open the plain CV">📜</button>
+      <button id="hud-pause" title="Pause (Esc)" aria-label="Pause">⏸</button>
+    </div>
+
+    <!-- Title -->
+    <section id="title" class="overlay">
+      <div class="title-card">
+        <p class="eyebrow">AN INTERACTIVE PIXEL CV</p>
+        <h1><span>SUPER</span> DILYOR</h1>
+        <p class="sub">Jump into the <b class="green">green pipes</b> to read each chapter of my CV, clear 3 worlds and squash <b class="pink">King Bugzer</b>, the final bug.</p>
+        <div class="btn-row">
+          <button id="btn-play" class="px-btn primary">▶ PLAY</button>
+          <button id="btn-cv" class="px-btn">📜 JUST READ THE CV</button>
+        </div>
+        <div class="controls">
+          <div><kbd>← →</kbd> move</div>
+          <div><kbd>SPACE</kbd> jump</div>
+          <div><kbd>X</kbd> run / shoot</div>
+          <div><kbd>↓</kbd> enter pipe</div>
+          <div><kbd>E</kbd> read</div>
+          <div><kbd>ESC</kbd> pause</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Part reader -->
+    <section id="dialog" class="overlay" role="dialog" aria-modal="true" aria-labelledby="dlg-title">
+      <div class="panel">
+        <div class="panel-head">
+          <span id="dlg-badge" class="badge"></span>
+          <h2 id="dlg-title"></h2>
+        </div>
+        <div id="dlg-body" class="panel-body"></div>
+        <div class="panel-foot">
+          <button id="btn-prev" class="px-btn small" aria-label="Previous part">◀</button>
+          <button id="btn-dialog-close" class="px-btn small primary">OK!</button>
+          <button id="btn-next" class="px-btn small" aria-label="Next part">▶</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pause -->
+    <section id="pause" class="overlay">
+      <div class="panel narrow">
+        <h2 class="center">PAUSED</h2>
+        <div class="stack">
+          <button id="btn-resume" class="px-btn primary">▶ RESUME</button>
+          <button id="btn-cv2" class="px-btn">📜 CV MODE</button>
+          <button id="btn-restart" class="px-btn">↺ BACK TO CHECKPOINT</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Plain CV -->
+    <section id="cv" class="overlay">
+      <div class="panel wide">
+        <div class="panel-head row">
+          <span class="badge">CV MODE</span>
+          <button id="btn-cv-close" class="px-btn small">✕ BACK</button>
+        </div>
+        <div id="cv-content" class="panel-body"></div>
+      </div>
+    </section>
+
+    <!-- Ending -->
+    <section id="ending" class="overlay">
+      <div class="panel">
+        <div class="panel-head">
+          <span class="badge">THE END</span>
+          <h2>THANK YOU FOR PLAYING!</h2>
+        </div>
+        <div class="panel-body">
+          <ul id="end-stats" class="stats"></ul>
+          <div id="end-contact"></div>
+        </div>
+        <div class="panel-foot">
+          <button id="btn-again" class="px-btn primary">↺ PLAY AGAIN</button>
+          <button id="btn-ending-cv" class="px-btn">📜 FULL CV</button>
+        </div>
+      </div>
+    </section>
+
+    <div id="rotate-hint">↻ rotate your phone for a bigger screen</div>
+
+    <!-- Touch controls -->
+    <div id="touch" aria-hidden="true">
+      <div class="dpad">
+        <button data-btn="left">◀</button>
+        <button data-btn="down">▼</button>
+        <button data-btn="right">▶</button>
+      </div>
+      <div class="ab">
+        <button data-btn="run" class="b">B</button>
+        <button data-btn="jump" class="a">A</button>
+      </div>
+    </div>
+  </main>
+
+  <script src="js/content.js"></script>
+  <script src="js/font.js"></script>
+  <script src="js/sprites.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/input.js"></script>
+  <script src="js/levels.js"></script>
+  <script src="js/world.js"></script>
+  <script src="js/entities.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
